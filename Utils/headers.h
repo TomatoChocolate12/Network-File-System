@@ -25,5 +25,7 @@
 #include <libgen.h>
 #include <stdbool.h>
 #include <sys/time.h>
+#include <netdb.h>
+#include <ifaddrs.h>
 
 #endif

@@ -536,25 +536,43 @@ void register_with_naming_server(int PORT, const char *storage_path)
     char *IPbuffer;
     struct hostent *host_entry;
 
-    // Retrieve the hostname
-    if (gethostname(hostbuffer, sizeof(hostbuffer)) == -1)
-    {
-        perror("gethostname");
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s;
+    char host[NI_MAXHOST];
+
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
         close(sock);
         return;
     }
 
-    // Retrieve host information
-    host_entry = gethostbyname(hostbuffer);
-    if (host_entry == NULL)
-    {
-        perror("gethostbyname");
-        close(sock);
-        return;
+    // Loop through linked list of interfaces
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        family = ifa->ifa_addr->sa_family;
+
+        // Check for IPv4 address
+        if (family == AF_INET) {
+            s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
+                            host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            if (s != 0) {
+                perror("getnameinfo");
+                close(sock);
+                freeifaddrs(ifaddr);
+                return;
+            }
+
+            // Skip loopback address
+            if (strcmp(host, "127.0.0.1") != 0) {
+                IPbuffer = strdup(host);
+                break;
+            }
+        }
     }
 
-    // Convert an Internet network address into ASCII string
-    IPbuffer = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0]));
+    freeifaddrs(ifaddr);
 
     // Step 4: Send IP address and PORT to Naming Server
     snprintf(buffer, sizeof(buffer), "%s:%d", IPbuffer, PORT);
