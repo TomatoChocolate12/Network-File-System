@@ -153,14 +153,35 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "INFO") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         send_file_info(client_socket, filename);
     }
     else if (strcmp(command, "STREAM") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         stream_audio(client_socket, filename);
     }
     else if (strcmp(command, "COPY_FILE") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
@@ -175,6 +196,13 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "COPY_DIR") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
@@ -244,6 +272,20 @@ void handle_client(int client_socket)
     }
     else if (strcmp("CREATE", command) == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        if(content == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         int type = atoi(content);
         if (type == 0)
         {
@@ -271,6 +313,20 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "DELETE") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        if(content == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         int type = atoi(content);
         if (type == 0)
         {
