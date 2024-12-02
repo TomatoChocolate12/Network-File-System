@@ -294,8 +294,9 @@ void *handle_ss_registration(void *client_socket_ptr)
             close(client_socket);
             return NULL;
         }
-        bool flag1=register_server(server_ip,server_port);
-        if(flag1==true){
+        bool flag1 = register_server(server_ip, server_port);
+        if (flag1 == true)
+        {
             pthread_mutex_unlock(&mutex);
             return NULL;
         }
@@ -478,31 +479,41 @@ void handle_ns_commands(char *command_buffer)
     // {
     //     printf("null");
     // }
-    if ((strcmp(command, "CREATE") == 0) && (args >= 3))
+    if ((strcmp(command, "CREATE") == 0) && (args == 4))
     {
         // printf("here");
         // printf("%d", type);
 
-        StorageServer * cr = find_storage_server(file_trie, path1);
-        if(cr == NULL)
+        StorageServer *cr = find_storage_server(file_trie, path1);
+        if (cr == NULL)
         {
-            LOG_ERROR;
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
         }
         StorageServer cre = *cr;
         send_create(cre.ip, cre.port, path2, type);
         // create(path1, type);
         printf("CREATE command executed successfully.\n");
     }
-    else if (strcmp(command, "DELETE") == 0 && args >= 3)
+    else if (strcmp(command, "DELETE") == 0 && args == 4)
     {
         // list_directory(path1);
         StorageServer cre = *find_storage_server(file_trie, path1);
-        printf("path2=%s\n", path2);
+        if(&cre == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        // printf("path2=%s\n", path2);
         send_delete(cre.ip, cre.port, path2, type);
         // delete (path1, type);
         printf("DELETE command executed successfully.\n");
     }
-    else if (strcmp(command, "COPY") == 0 && args >= 2)
+    else if (strcmp(command, "COPY") == 0 && args >= 3)
     {
         // copy_file(path1, path2);
         StorageServer src = *find_storage_server(file_trie, path1);
@@ -738,7 +749,7 @@ int main()
                 }
                 pthread_detach(thread_id);
             }
-            else if (strcmp(token, "CREATE") == 0 || strcmp(token, "COPY") == 0 || strcmp(token, "DELETE") == 0)
+            else if (strcmp(token, "CREATE") == 0 || strcmp(token, "COPY") == 0 || strcmp(token, "DELETE") == 0 || strcmp(token, "LIST") == 0)
             {
                 handle_ns_commands(command_buffer);
             }
@@ -768,7 +779,7 @@ int main()
             }
         }
     }
-        
+
     close(server_fd);
     return 0;
 }

@@ -3,6 +3,78 @@
 
 int PORT = 0;
 
+typedef struct FileLock
+{
+    char filename[256];
+    pthread_rwlock_t lock;
+    struct FileLock *next;
+} FileLock;
+
+FileLock *lock_list_head = NULL;                             // Head of the linked list for file locks
+pthread_mutex_t lock_list_mutex = PTHREAD_MUTEX_INITIALIZER; // Protects access to the lock list
+
+pthread_rwlock_t *get_file_lock(const char *filename)
+{
+    pthread_rwlock_t *rwlock = NULL;
+
+    // Lock the lock list
+    pthread_mutex_lock(&lock_list_mutex);
+
+    // Search for the file lock
+    FileLock *current = lock_list_head;
+    while (current)
+    {
+        if (strcmp(current->filename, filename) == 0)
+        {
+            rwlock = &current->lock;
+            break;
+        }
+        current = current->next;
+    }
+
+    // If not found, create a new lock
+    if (!rwlock)
+    {
+        FileLock *new_lock = (FileLock *)malloc(sizeof(FileLock));
+        if (!new_lock)
+        {
+            perror("Failed to allocate memory for file lock");
+            pthread_mutex_unlock(&lock_list_mutex);
+            return NULL;
+        }
+
+        // Initialize the lock
+        strcpy(new_lock->filename, filename);
+        pthread_rwlock_init(&new_lock->lock, NULL);
+        new_lock->next = lock_list_head;
+        lock_list_head = new_lock;
+
+        rwlock = &new_lock->lock;
+    }
+
+    // Unlock the lock list
+    pthread_mutex_unlock(&lock_list_mutex);
+
+    return rwlock;
+}
+
+void destroy_all_file_locks()
+{
+    pthread_mutex_lock(&lock_list_mutex);
+
+    FileLock *current = lock_list_head;
+    while (current)
+    {
+        FileLock *to_free = current;
+        pthread_rwlock_destroy(&current->lock);
+        current = current->next;
+        free(to_free);
+    }
+
+    lock_list_head = NULL;
+    pthread_mutex_unlock(&lock_list_mutex);
+}
+
 void create_backup_path(const char *filename, char *backup_file) {
     // Find the first occurrence of '/' in filename
     const char *slash_pos = strstr(filename, "/");
@@ -157,13 +229,52 @@ void handle_client(int client_socket)
 
     if (strcmp(command, "READ") == 0)
     {
+        pthread_rwlock_t *file_lock = get_file_lock(filename);
+        if (!file_lock)
+        {
+            write(client_socket, "Failed to acquire file lock\n", 27);
+            return;
+        }
+
+        // Acquire read lock
+        if (pthread_rwlock_rdlock(file_lock) != 0)
+        {
+            perror("Failed to acquire read lock");
+            write(client_socket, "Lock Error\n", 11);
+            return;
+        }
+
+        // Perform the read operation
         send_file_content(client_socket, filename);
 
+        // Release the lock
+        if (pthread_rwlock_unlock(file_lock) != 0)
+        {
+            perror("Failed to release read lock");
+        }
     }
+
     else if (strcmp(command, "WRITE") == 0)
     {
+        pthread_rwlock_t *file_lock = get_file_lock(filename);
+        if (!file_lock)
+        {
+            write(client_socket, "Failed to acquire file lock\n", 27);
+            return;
+        }
+
+        // Acquire write lock
+        if (pthread_rwlock_wrlock(file_lock) != 0)
+        {
+            perror("Failed to acquire write lock");
+            write(client_socket, "Lock Error\n", 11);
+            return;
+        }
+
+        // Perform the write operation
         if (strcmp(flag, "SYNC") == 0 || strlen(content) < 50)
         {
+            sleep(1);
             write_to_file(client_socket, filename, content);
         }
         else
@@ -171,18 +282,45 @@ void handle_client(int client_socket)
             async_write(client_socket, filename, content, NM_IP);
         }
         sync_to_backup(filename,backup_file);
+
+        // Release the lock
+        if (pthread_rwlock_unlock(file_lock) != 0)
+        {
+            perror("Failed to release write lock");
+        }
     }
     else if (strcmp(command, "INFO") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         send_file_info(client_socket, filename);
     }
     else if (strcmp(command, "STREAM") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         stream_audio(client_socket, filename);
     }
     else if (strcmp(command, "COPY_FILE") == 0)
     {
         create_backup_path(content,backup_file);
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
@@ -204,6 +342,13 @@ void handle_client(int client_socket)
     else if (strcmp(command, "COPY_DIR") == 0)
     {
         create_backup_path(content,backup_file);
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
@@ -279,6 +424,20 @@ void handle_client(int client_socket)
     }
     else if (strcmp("CREATE", command) == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        if(content == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         int type = atoi(content);
         if (type == 0)
         {
@@ -328,6 +487,20 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "DELETE") == 0)
     {
+        if(filename == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        if(content == NULL)
+        {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
         int type = atoi(content);
         if (type == 0)
         {
@@ -627,34 +800,6 @@ int receive_file(int sock, const char *dest_path)
     return 0;
 }
 
-// // Receives directory on the Destination Storage Server.
-// int receive_dir_ss(client_socket)
-// {
-//     char buffer[MAX_PATH_LENGTH];
-
-//     int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0);
-//     if (bytes_received <= 0)
-//     {
-//         close(client_socket);
-//         return NULL;
-//     }
-//     buffer[bytes_received] = '\0';
-//     char directory_path[BUFFER_SIZE];
-//     strncpy(directory_path, buffer, BUFFER_SIZE);
-
-//     // Step 3: Receive the file structure from the Naming Server
-//     while ((bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0)
-//     {
-//         buffer[bytes_received] = '\0';
-
-//         // Check if it's the end of the file list
-//         if (strcmp(buffer, "END") == 0)
-//         {
-//             break;
-//         }
-//     }
-// }
-
 void stream_audio(int client_socket, const char *filename)
 {
     printf("%s\n", filename);
@@ -739,24 +884,28 @@ void register_with_naming_server(int PORT, const char *storage_path)
     int family, s;
     char host[NI_MAXHOST];
 
-    if (getifaddrs(&ifaddr) == -1) {
+    if (getifaddrs(&ifaddr) == -1)
+    {
         perror("getifaddrs");
         close(sock);
         return;
     }
 
     // Loop through linked list of interfaces
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
         if (ifa->ifa_addr == NULL)
             continue;
 
         family = ifa->ifa_addr->sa_family;
 
         // Check for IPv4 address
-        if (family == AF_INET) {
+        if (family == AF_INET)
+        {
             s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
                             host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-            if (s != 0) {
+            if (s != 0)
+            {
                 perror("getnameinfo");
                 close(sock);
                 freeifaddrs(ifaddr);
@@ -764,7 +913,8 @@ void register_with_naming_server(int PORT, const char *storage_path)
             }
 
             // Skip loopback address
-            if (strcmp(host, "127.0.0.1") != 0) {
+            if (strcmp(host, "127.0.0.1") != 0)
+            {
                 IPbuffer = strdup(host);
                 break;
             }
@@ -1091,3 +1241,4 @@ void ss_duplicate(const char *storage_path)
 
     printf("All files and folders have been duplicated into the 'backup' directory.\n");
 } 
+
