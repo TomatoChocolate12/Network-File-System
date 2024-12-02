@@ -38,8 +38,6 @@ void insert_file(FileNode **head, const char *path)
     }
 }
 
-
-
 void initialize_backup_directory_network(int server_id, int n, const char *src_dir, const char *dest_dir1, const char *dest_dir2)
 {
     int backup1 = (server_id + 1) % n;
@@ -180,12 +178,15 @@ void *health_monitor(void *arg)
     return NULL;
 }
 
-bool register_server(const char *ip,int port){
-    for(int i=0;i<server_count;i++){
-        if(server_health[i].port==port){
-            server_health[i].is_active=true;
-            printf("server with port %d back online",port);
-            
+bool register_server(const char *ip, int port)
+{
+    for (int i = 0; i < server_count; i++)
+    {
+        if (server_health[i].port == port)
+        {
+            server_health[i].is_active = true;
+            printf("server with port %d back online", port);
+
             return true;
         }
     }
@@ -251,8 +252,9 @@ void *handle_ss_registration(void *client_socket_ptr)
             close(client_socket);
             return NULL;
         }
-        bool flag1=register_server(server_ip,server_port);
-        if(flag1==true){
+        bool flag1 = register_server(server_ip, server_port);
+        if (flag1 == true)
+        {
             pthread_mutex_unlock(&mutex);
             return NULL;
         }
@@ -440,8 +442,8 @@ void handle_ns_commands(char *command_buffer)
         // printf("here");
         // printf("%d", type);
 
-        StorageServer * cr = find_storage_server(file_trie, path1);
-        if(cr == NULL)
+        StorageServer *cr = find_storage_server(file_trie, path1);
+        if (cr == NULL)
         {
             LOG_ERROR;
         }
@@ -725,7 +727,7 @@ int main()
             }
         }
     }
-        
+
     close(server_fd);
     return 0;
 }
