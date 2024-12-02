@@ -3,6 +3,140 @@
 
 int PORT = 0;
 
+void create_backup_path(const char *filename, char *backup_file) {
+    // Find the first occurrence of '/' in filename
+    const char *slash_pos = strstr(filename, "/");
+
+    if (slash_pos) {
+        // Get the position of the slash in the filename
+        size_t prefix_len = slash_pos - filename + 1; // Include '/'
+        
+        // Copy the prefix (up to and including the '/')
+        strncpy(backup_file, filename, prefix_len);
+        backup_file[prefix_len] = '\0'; // Null-terminate
+
+        // Append "backup/" and the remaining filename after the '/'
+        snprintf(backup_file + prefix_len, 300 - prefix_len, "backup%s", slash_pos);
+    } else {
+        // No '/' found; just prefix the filename with "/backup/"
+        snprintf(backup_file, 300, "/backup/%s", filename);
+    }
+}
+void sync_to_backup(const char *filename, const char *backup_file)
+{
+    struct stat st;
+    
+    // Check if the source file or directory exists
+    if (stat(filename, &st) < 0)
+    {
+        perror("Failed to stat source path");
+        return;
+    }
+
+    // Handle directory synchronization
+    if (S_ISDIR(st.st_mode))
+    {
+        // Ensure the destination directory exists
+        if (mkdir(backup_file, 0755) < 0 && errno != EEXIST)
+        {
+            perror("Failed to create backup directory");
+            return;
+        }
+
+        DIR *dir = opendir(filename);
+        if (!dir)
+        {
+            perror("Failed to open source directory");
+            return;
+        }
+
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL)
+        {
+            // Skip "." and ".."
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+
+            // Construct full paths for the source and destination
+            char src_path[4096];
+            char dest_path[4096];
+            snprintf(src_path, sizeof(src_path), "%s/%s", filename, entry->d_name);
+            snprintf(dest_path, sizeof(dest_path), "%s/%s", backup_file, entry->d_name);
+
+            // Recursively sync
+            sync_to_backup(src_path, dest_path);
+        }
+
+        closedir(dir);
+    }
+    else if (S_ISREG(st.st_mode))
+    {
+        // Handle regular file synchronization
+        int src_fd, dest_fd;
+        char buffer[4096];
+        ssize_t bytes_read, bytes_written;
+
+        // Open the source file
+        src_fd = open(filename, O_RDONLY);
+        if (src_fd < 0)
+        {
+            perror("Failed to open source file for backup");
+            return;
+        }
+
+        // Open or create the backup file
+        dest_fd = open(backup_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (dest_fd < 0)
+        {
+            perror("Failed to open or create backup file");
+            close(src_fd);
+            return;
+        }
+
+        // Copy the content from source to destination
+        while ((bytes_read = read(src_fd, buffer, sizeof(buffer))) > 0)
+        {
+            bytes_written = write(dest_fd, buffer, bytes_read);
+            if (bytes_written < 0)
+            {
+                perror("Failed to write to backup file");
+                close(src_fd);
+                close(dest_fd);
+                return;
+            }
+        }
+
+        if (bytes_read < 0)
+        {
+            perror("Failed to read from source file");
+        }
+
+        // Close the file descriptors
+        close(src_fd);
+        close(dest_fd);
+    }
+    else
+    {
+        fprintf(stderr, "Unsupported file type for: %s\n", filename);
+    }
+}
+
+void sync_directory_to_backup(const char *dir, const char *backup_dir)
+{
+    char command[BUFFER_SIZE];
+    snprintf(command, sizeof(command), "cp -r %s %s", dir, backup_dir);
+    int result = system(command);
+
+    if (result == -1)
+    {
+        perror("Failed to sync directory to backup");
+    }
+    else
+    {
+        printf("Directory %s successfully copied to backup %s\n", dir, backup_dir);
+    }
+}
+
 void handle_client(int client_socket)
 {
     char buffer[BUFFER_SIZE];
@@ -11,12 +145,15 @@ void handle_client(int client_socket)
     printf("%s\n", buffer);
 
     // Parse command and filename
-    char command[256], filename[256], content[BUFFER_SIZE], flag[256];
+    char command[256], filename[256], content[BUFFER_SIZE], flag[256], backup_file[300];
 
     sscanf(buffer, "%s %s %s %[^\n]", command, filename, content, flag); // fail
 
     printf("%s\n", command);
     printf("%s\n", filename);
+    printf("%s\n",content);
+    create_backup_path(filename,backup_file);
+    printf("%s\n",backup_file);
 
     if (strcmp(command, "READ") == 0)
     {
@@ -33,6 +170,7 @@ void handle_client(int client_socket)
         {
             async_write(client_socket, filename, content, NM_IP);
         }
+        sync_to_backup(filename,backup_file);
     }
     else if (strcmp(command, "INFO") == 0)
     {
@@ -44,10 +182,17 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "COPY_FILE") == 0)
     {
+        create_backup_path(content,backup_file);
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
             receive_file(client_socket, content);
+            if (strstr(content, "backup") != NULL) {
+    // The string contains "backup", skip it
+            } else {
+                printf("content=%s\n", content);
+                sync_to_backup(content, backup_file);
+            }
         }
         else if (strcmp(filename, "SRC") == 0)
         {
@@ -58,6 +203,7 @@ void handle_client(int client_socket)
     }
     else if (strcmp(command, "COPY_DIR") == 0)
     {
+        create_backup_path(content,backup_file);
         if (strcmp(filename, "DEST") == 0)
         {
             printf("Destination Port, receiving file from server at point: %s\n", content);
@@ -96,6 +242,12 @@ void handle_client(int client_socket)
             {
                 perror("Failed to change back to the original directory");
                 return;
+            }
+            if (strstr(content, "backup") != NULL) {
+    // The string contains "backup", skip it
+            } else {
+                printf("content=%s\n", content);
+                sync_to_backup(content, backup_file);
             }
         }
         else if (strcmp(filename, "SRC") == 0)
@@ -138,6 +290,15 @@ void handle_client(int client_socket)
             else
             {
                 printf("File created");
+                int fx = open(backup_file, O_CREAT | O_TRUNC, 0644);
+                if (fx < 0)
+                {
+                    perror("File not created");
+                }
+                else
+                {
+                    printf("File created");
+                }
             }
         }
         else if (type == 1)
@@ -145,6 +306,19 @@ void handle_client(int client_socket)
             if (mkdir(filename, 0755) == 0)
             {
                 printf("Directory created");
+                if(strstr(filename, "backup") != NULL){
+
+                }else{
+
+                    if (mkdir(backup_file, 0755) == 0)
+                    {
+                        printf("Directory created");
+                    }
+                    else
+                    {
+                        perror("Directory not created");
+                    }
+                }
             }
             else
             {
@@ -160,6 +334,14 @@ void handle_client(int client_socket)
             if (unlink(filename) == 0)
             {
                 printf("File deleted");
+                if (unlink(backup_file) == 0)
+                {
+                    printf("backup File deleted");
+                }
+                else
+                {
+                    perror("backup File not deleted");
+                }
             }
             else
             {
@@ -170,6 +352,7 @@ void handle_client(int client_socket)
         if (type == 1)
         {
             char *args[] = {"rm", "-r", (char *)filename, NULL};
+            char *backup_args[] = {"rm", "-r", (char *)backup_file, NULL};
 
             // Fork a new process to execute the command
             pid_t pid = fork();
@@ -203,6 +386,22 @@ void handle_client(int client_socket)
                     printf("Failed to delete directory '%s'.\n", filename);
                 }
             }
+            pid = fork();
+                if (pid == -1)
+                {
+                    perror("Failed to fork for backup");
+                    exit(EXIT_FAILURE);
+                }
+                else if (pid == 0)
+                {
+                    execvp("rm", backup_args);
+                    perror("execvp failed for backup");
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    waitpid(pid, NULL, 0);
+                }
             return;
         }
         return;
@@ -581,7 +780,9 @@ void register_with_naming_server(int PORT, const char *storage_path)
 
     // Step 5: Send the storage path to Naming Server
     usleep(10000);
-    send(sock, storage_path, strlen(storage_path), 0);
+    char* dir = strstr(storage_path,"/S");
+    dir++;
+    send(sock, dir, strlen(dir), 0);
     printf("Sent storage path to Naming Server: %s\n", storage_path);
 
     usleep(10000);
@@ -782,15 +983,11 @@ int create_directory(const char *path)
     return 0;
 }
 
-// Function to copy a file from source to destination
 void copy_file(const char *source, const char *destination)
 {
     FILE *src_file = fopen(source, "rb");
     if (!src_file)
     {
-        char err_mess[50];
-        get_error_message(1, err_mess, sizeof(err_mess));
-        log_message(2, err_mess);
         perror("Error opening source file");
         return;
     }
@@ -798,9 +995,6 @@ void copy_file(const char *source, const char *destination)
     FILE *dest_file = fopen(destination, "wb");
     if (!dest_file)
     {
-        char err_mess[50];
-        get_error_message(1, err_mess, sizeof(err_mess));
-        log_message(2, err_mess);
         perror("Error opening destination file");
         fclose(src_file);
         return;
@@ -817,16 +1011,13 @@ void copy_file(const char *source, const char *destination)
     fclose(dest_file);
 }
 
-// Recursive function to duplicate a directory
-// Recursive function to duplicate a directory
+
+
 void duplicate_directory(const char *src_dir, const char *dest_dir)
 {
     DIR *dir = opendir(src_dir);
     if (!dir)
     {
-        char err_mess[50];
-        get_error_message(1, err_mess, sizeof(err_mess));
-        log_message(2, err_mess);
         perror("Error opening source directory");
         return;
     }
@@ -840,6 +1031,10 @@ void duplicate_directory(const char *src_dir, const char *dest_dir)
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
 
+        // Skip files or directories with names starting with "backup"
+        if (strncmp(entry->d_name, "backup", strlen("backup")) == 0)
+            continue;
+
         // Construct full source and destination paths
         char src_path[1024];
         snprintf(src_path, sizeof(src_path), "%s/%s", src_dir, entry->d_name);
@@ -847,16 +1042,9 @@ void duplicate_directory(const char *src_dir, const char *dest_dir)
         char dest_path[1024];
         snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
 
-        // Skip the backup directory to prevent infinite recursion
-        if (strcmp(entry->d_name, "backup") == 0)
-            continue;
-
         // Get entry details
         if (stat(src_path, &entry_stat) == -1)
         {
-            char err_mess[50];
-            get_error_message(5, err_mess, sizeof(err_mess));
-            log_message(2, err_mess);
             perror("Error getting file status");
             continue;
         }
@@ -879,18 +1067,20 @@ void duplicate_directory(const char *src_dir, const char *dest_dir)
 void ss_duplicate(const char *storage_path)
 {
     char current_dir[PATH_MAX];
-    snprintf(current_dir,PATH_MAX,"%s",storage_path);
-    
+    snprintf(current_dir, PATH_MAX, "%s", storage_path);
+
     char backup_dir[PATH_MAX];
     snprintf(backup_dir, PATH_MAX, "%s/backup", storage_path);
-    
+
     // Ensure the backup directory exists or try an alternative name
-    if (create_directory(backup_dir) != 0) {
+    if (create_directory(backup_dir) != 0)
+    {
         // If the creation of 'backup' fails, try creating 'backup_new'
         snprintf(backup_dir, PATH_MAX, "%s/backup_new", storage_path);
-        if (create_directory(backup_dir) != 0) {
+        if (create_directory(backup_dir) != 0)
+        {
             // If the creation of 'backup_new' also fails, report an error and exit
-            fprintf(stderr, "Error: Unable to create backup directory at %s or %s.\n", 
+            fprintf(stderr, "Error: Unable to create backup directory at %s or %s.\n",
                     storage_path, backup_dir);
             return;
         }
@@ -900,5 +1090,4 @@ void ss_duplicate(const char *storage_path)
     duplicate_directory(current_dir, backup_dir);
 
     printf("All files and folders have been duplicated into the 'backup' directory.\n");
-    
-}
+} 

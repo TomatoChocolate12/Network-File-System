@@ -314,6 +314,7 @@ void copy_directory_network(const char *src, const char *dest, const char *src_s
     }
 
     // Connect to destination server
+    printf("%s %d",dest_server_ip,dest_port);
     int dest_sock = connect_to_storage(dest_server_ip, dest_port);
     if (dest_sock < 0)
     {

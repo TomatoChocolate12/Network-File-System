@@ -38,7 +38,12 @@ void insert_file(FileNode **head, const char *path)
     }
 }
 
-
+void remove_prefix(char *str, const char *prefix) {
+    char *pos = strstr(str, prefix);
+    if (pos == str) { // Check if the prefix is at the beginning
+        memmove(pos, pos + strlen(prefix), strlen(pos + strlen(prefix)) + 1);
+    }
+}
 
 void initialize_backup_directory_network(int server_id, int n, const char *src_dir, const char *dest_dir1, const char *dest_dir2)
 {
@@ -180,17 +185,55 @@ void *health_monitor(void *arg)
     return NULL;
 }
 
+
 bool register_server(const char *ip,int port){
     for(int i=0;i<server_count;i++){
+        printf("port=%d",server_health[i].port);
         if(server_health[i].port==port){
             server_health[i].is_active=true;
-            printf("server with port %d back online",port);
-            
+            printf("server with port %d back online\n",port);
+            printf("%d %d\n",server_count,i);
+            if(server_count>=3){
+                sleep(10);
+                char src_path1[MAX_PATH_LENGTH],src_path2[MAX_PATH_LENGTH];
+                snprintf(src_path1,MAX_PATH_LENGTH,"%s/backup",src_dest[(i-1+server_count)%server_count].dir_path);
+                snprintf(src_path2,MAX_PATH_LENGTH,"%s/backup",src_dest[(i-2+server_count)%server_count].dir_path);
+                
+                char dest_path1[MAX_PATH_LENGTH],dest_path2[MAX_PATH_LENGTH];
+                snprintf(dest_path1,MAX_PATH_LENGTH,"%s/backup_s%d_s%d",src_dest[i].dir_path,i,(i-1+server_count)%server_count);
+                snprintf(dest_path2,MAX_PATH_LENGTH,"%s/backup_s%d_s%d",src_dest[i].dir_path,i,(i-2+server_count)%server_count);
+
+                remove_prefix(src_path1,"Test/");
+                remove_prefix(src_path2,"Test/");
+                remove_prefix(dest_path1,"Test/");
+                remove_prefix(dest_path2,"Test/");
+
+                copy_directory_network(src_path1,dest_path1,storage_servers[(i-1+server_count)%server_count].ip,storage_servers[i].ip,storage_servers[(i-1+server_count)%server_count].port,storage_servers[i].port,0);
+                sleep(5);
+                printf("works\n");
+                copy_directory_network(src_path2,dest_path2,storage_servers[(i-2+server_count)%server_count].ip,storage_servers[i].ip,storage_servers[(i-2+server_count)%server_count].port,storage_servers[i].port,0);
+                
+                char src_path3[MAX_PATH_LENGTH]; // for the server coming up
+                snprintf(src_path3,MAX_PATH_LENGTH,"%s/backup",src_dest[i].dir_path);
+                char dest_path3[MAX_PATH_LENGTH], dest_path4[MAX_PATH_LENGTH]; // for backups coming up
+                snprintf(dest_path3,MAX_PATH_LENGTH,"%s/backup_s%d_s%d",src_dest[(i+1)%server_count].dir_path,(i+1)%server_count,i);
+                snprintf(dest_path4,MAX_PATH_LENGTH,"%s/backup_s%d_s%d",src_dest[(i+2)%server_count].dir_path,(i+2)%server_count,i);
+                remove_prefix(src_path3,"Test/");
+                remove_prefix(dest_path3,"Test/");
+                remove_prefix(dest_path4,"Test/");
+
+                copy_directory_network(src_path3,dest_path3,storage_servers[i].ip,storage_servers[(i+1)%server_count].ip,storage_servers[i].port,storage_servers[(i+1)%server_count].port,0);
+                sleep(5);
+                printf("works\n");
+                copy_directory_network(src_path3,dest_path4,storage_servers[i].ip,storage_servers[(i+2)%server_count].ip,storage_servers[i].port,storage_servers[(i+2)%server_count].port,0);
+                
+            }
             return true;
         }
     }
     return false;
 }
+
 void *handle_client(void *client_socket)
 {
     int sock = *(int *)client_socket;

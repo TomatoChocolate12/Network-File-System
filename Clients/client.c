@@ -54,7 +54,7 @@ void send_request(const char *request)
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(NAMING_SERVER_PORT);
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_addr.sin_addr.s_addr = inet_addr(NM_IP);
 
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
