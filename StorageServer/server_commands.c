@@ -274,7 +274,6 @@ void handle_client(int client_socket)
         // Perform the write operation
         if (strcmp(flag, "SYNC") == 0 || strlen(content) < 50)
         {
-            sleep(1);
             write_to_file(client_socket, filename, content);
         }
         else
@@ -702,7 +701,11 @@ void send_file_content(int client_socket, const char *filepath)
 }
 
 void write_to_file(int client_socket, const char *filename, const char *content)
-{
+{   
+    if (strstr(filename,"/backup_s")){
+        write(client_socket, "Can't Write to Backup\n", 23);
+        return;
+    }
     FILE *file = fopen(filename, "w");
     if (file == NULL)
     {
