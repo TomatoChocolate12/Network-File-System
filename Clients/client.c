@@ -84,6 +84,19 @@ void send_request(const char *request)
         close(sock);
         return;
     }
+    else if(strcmp(command, "LIST") == 0){
+        printf("Received file paths:\n");
+        while (1)
+        {
+            int bytes_read = recv(sock, buffer, BUFFER_SIZE, 0);
+            buffer[bytes_read] = '\0';
+            if (strcmp(buffer, "END") == 0)
+            {
+            break;
+            }
+            printf("%s\n", buffer);
+        }
+    }
     else if (strcmp(command, "READ") == 0)
     {
         // Handle READ command

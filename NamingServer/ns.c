@@ -466,8 +466,9 @@ void handle_ns_commands(char *command_buffer)
             log_message(3, err_mess);
             return;
         }
-        // printf("path2=%s\n", path2);
+        printf("path2=%s\n", path2);
         send_delete(cre.ip, cre.port, path2, type);
+        delete_path(file_trie,path2,cre.ip, cre.port);
         // delete (path1, type);
         printf("DELETE command executed successfully.\n");
     }
@@ -484,6 +485,9 @@ void handle_ns_commands(char *command_buffer)
         {
             copy_file_network(path1, path2, src.ip, dest.ip, src.port, dest.port);
             printf("COPY_FILE command executed successfully.\n");
+            char combined_path[PATH_MAX];
+            snprintf(combined_path, PATH_MAX, "%s/%s", path2, path1);
+            insert_path(file_trie, combined_path, dest.ip, dest.port);
         }
         else if (args == 4 && type == 1)
         {
@@ -491,6 +495,7 @@ void handle_ns_commands(char *command_buffer)
 
             copy_directory_network(path1, path2, src.ip, dest.ip, src.port, dest.port, 1);
             printf("COPY_DIR command executed successfully.\n");
+
         }
         else
         {
@@ -500,6 +505,7 @@ void handle_ns_commands(char *command_buffer)
     }
     else if (strcmp(command, "LIST") == 0)
     {
+        // Send "hi" to the client
         print_all_paths(file_trie);
     }
     else if (strcmp(command, "QUIT") == 0)
@@ -710,6 +716,14 @@ int main()
             else if (strcmp(token, "CREATE") == 0 || strcmp(token, "COPY") == 0 || strcmp(token, "DELETE") == 0 || strcmp(token, "LIST") == 0)
             {
                 handle_ns_commands(command_buffer);
+                if (strcmp(token, "LIST") == 0) {
+                    int saved_stdout = dup(STDOUT_FILENO);
+                    dup2(new_socket, STDOUT_FILENO);
+                    print_all_paths(file_trie);
+                    dup2(saved_stdout, STDOUT_FILENO);
+                    close(saved_stdout);
+                    send(new_socket, "END", strlen("END"), 0);
+                }
             }
             else
             {

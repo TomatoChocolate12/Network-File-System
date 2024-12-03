@@ -159,6 +159,59 @@ void delete_path(TrieNode *root, const char *path, const char *server_ip, int se
     }
 }
 
+void reroute_prefix(TrieNode *root, char *src_path, char *dest_path, char *dest_ip, int dest_port)
+{
+    TrieNode *src_node = root;
+    TrieNode *dest_node = root;
+
+    // Traverse to the source path node
+    for (int i = 0; src_path[i] != '\0'; i++)
+    {
+        int index = (unsigned char)src_path[i];
+        if (!src_node->children[index])
+        {
+            printf("Source path '%s' does not exist.\n", src_path);
+            return;
+        }
+        src_node = src_node->children[index];
+    }
+
+    // Traverse to the destination path node, creating nodes if necessary
+    for (int i = 0; dest_path[i] != '\0'; i++)
+    {
+        int index = (unsigned char)dest_path[i];
+        if (!dest_node->children[index])
+        {
+            dest_node->children[index] = create_node();
+        }
+        dest_node = dest_node->children[index];
+    }
+
+    // Copy the subtree from src_node to dest_node
+    copy_subtree(src_node, dest_node, dest_ip, dest_port);
+}
+
+// Helper function to copy the subtree
+void copy_subtree(TrieNode *src, TrieNode *dest, char* dest_ip, int dest_port)
+{
+    if (!src)
+        return;
+    dest->is_end_of_path = src->is_end_of_path;
+    if (src->is_end_of_path)
+    {
+        strcpy(dest->SS.ip, dest_ip);
+        dest->SS.port = dest_port;
+    }
+    for (int i = 0; i < MAX_CHILDREN; i++)
+    {
+        if (src->children[i])
+        {
+            dest->children[i] = create_node();
+            copy_subtree(src->children[i], dest->children[i], dest_ip, dest_port);
+        }
+    }
+}
+
 StorageServer *find_storage_server(TrieNode *root, const char *path)
 {
     if (!root || !path)
@@ -195,7 +248,6 @@ StorageServer *find_storage_server(TrieNode *root, const char *path)
     // printf("null\n");
     return NULL; // Path exists but is not marked as a complete path
 }
-
 
 // // Example usage
 // int main() {
