@@ -354,7 +354,7 @@ void copy_directory_network(const char *src, const char *dest, const char *src_s
     // ROUTE DIRECTORY information over network until acknowledgement of a stop bit.
     // route_dir_ns(src_sock, dest_sock, dest);
     route_file_ns(src_sock, dest_sock, dest);
-
+    reroute_prefix(file_trie,src,dest,src_server_ip,dest_server_ip);
     if(flag==1){
     close(src_sock);
 

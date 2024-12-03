@@ -1,0 +1,38 @@
+[Tue Dec  3 20:46:09 2024] INFO: Received registration request from 127.0.0.1:45596 - Data: 192.168.176.214:8080
+[Tue Dec  3 20:46:09 2024] INFO: Storage Server 192.168.176.214:8080 - Directory Path: SS1
+[Tue Dec  3 20:46:09 2024] INFO: Received file: SS1/lol.txt
+[Tue Dec  3 20:46:09 2024] INFO: Received file: SS1/backup
+[Tue Dec  3 20:46:09 2024] INFO: Received file: SS1/backup/lol.txt
+[Tue Dec  3 20:46:09 2024] INFO: Received file: SS1/backup/test
+[Tue Dec  3 20:46:09 2024] INFO: Received file: SS1/test
+[Tue Dec  3 20:46:09 2024] INFO: Successfully registered storage server 192.168.176.214:8080 (Server Count: 1)
+[Tue Dec  3 20:46:16 2024] INFO: Received registration request from 127.0.0.1:60868 - Data: 192.168.176.214:7070
+[Tue Dec  3 20:46:16 2024] INFO: Storage Server 192.168.176.214:7070 - Directory Path: SS2
+[Tue Dec  3 20:46:16 2024] INFO: Received file: SS2/check
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check/lol.txt
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check/hello.txt
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check/SS1
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check/SS1/a
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check/SS1/a/lol.txt
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/check2.tar.gz
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/backup
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/backup/check
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/backup/check/lol.txt
+[Tue Dec  3 20:46:17 2024] INFO: Received file: SS2/backup/check/hello.txt
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check/SS1
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check/SS1/a
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check/SS1/a/lol.txt
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2.tar.gz
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2/lol.txt
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2/no
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2/SS1
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2/SS1/a
+[Tue Dec  3 20:46:18 2024] INFO: Received file: SS2/backup/check2/SS1/a/lol.txt
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2/lol.txt
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2/no
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2/SS1
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2/SS1/a
+[Tue Dec  3 20:46:19 2024] INFO: Received file: SS2/check2/SS1/a/lol.txt
+[Tue Dec  3 20:46:19 2024] INFO: Successfully registered storage server 192.168.176.214:7070 (Server Count: 2)
