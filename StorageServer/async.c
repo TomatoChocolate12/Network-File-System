@@ -159,6 +159,7 @@ void *async_write(int client_socket, const char *filename, char *content, const 
             copy_async_file(temp, filename);
             unlink(temp);
             write(ns_socket, "ASYNC: Could not write as Storage server collapsed", 43);
+            // write(client_socket, "ASYNC: Could not write as Storage server collapsed", 43);
         }
         else if (strcmp(health, "Healthy") == 0)
         {
@@ -170,6 +171,7 @@ void *async_write(int client_socket, const char *filename, char *content, const 
             printf("Written\n");
         }
         close(ns_socket); // Close the naming server socket
+        // close(client_socket);
     }
     else
     {
