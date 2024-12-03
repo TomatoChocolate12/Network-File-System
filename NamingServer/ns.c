@@ -500,7 +500,14 @@ void handle_ns_commands(char *command_buffer)
     else if (strcmp(command, "DELETE") == 0 && args == 4)
     {
         // list_directory(path1);
-        StorageServer cre = *find_storage_server(file_trie, path1);
+        StorageServer *cre_ptr = find_storage_server(file_trie, path1);
+        if (cre_ptr == NULL) {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+        StorageServer cre = *cre_ptr;
         if(&cre == NULL)
         {
             char err_mess[50];
@@ -517,8 +524,18 @@ void handle_ns_commands(char *command_buffer)
     else if (strcmp(command, "COPY") == 0 && args >= 3)
     {
         // copy_file(path1, path2);
-        StorageServer src = *find_storage_server(file_trie, path1);
-        StorageServer dest = *find_storage_server(file_trie, path2);
+        StorageServer *src_ptr = find_storage_server(file_trie, path1);
+        StorageServer *dest_ptr = find_storage_server(file_trie, path2);
+
+        if (src_ptr == NULL || dest_ptr == NULL) {
+            char err_mess[50];
+            get_error_message(4, err_mess, sizeof(err_mess));
+            log_message(3, err_mess);
+            return;
+        }
+
+        StorageServer src = *src_ptr;
+        StorageServer dest = *dest_ptr;
 
         printf("Source Server Port: %d\n", src.port);
         printf("Destination Server Port: %d\n", dest.port);
@@ -773,8 +790,16 @@ int main()
                 char *command = strtok(command_buffer, " ");
                 char *path = strtok(NULL, " ");
                 printf("Command: %s, Path: %s\n", command, path);
-                storage_servers[MAX_STORAGE_SERVERS - 1] = *find_storage_server(file_trie, path);
+                StorageServer *found_server = find_storage_server(file_trie, path);
                 int *client_socket_ptr = malloc(sizeof(int));
+                if (found_server == NULL) {
+                    const char *error_msg = "Error: Storage server not found for the given path";
+                    send(new_socket, error_msg, strlen(error_msg), 0);
+                    close(new_socket);
+                    free(client_socket_ptr);
+                    continue;
+                }
+                storage_servers[MAX_STORAGE_SERVERS - 1] = *find_storage_server(file_trie, path);
                 if (!client_socket_ptr)
                 {
                     perror("Failed to allocate memory for socket pointer");
